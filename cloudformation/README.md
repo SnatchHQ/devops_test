@@ -14,10 +14,10 @@ As detailed in this [exported PNG](SnatchTestVPC1-designer.png), there is an ELB
 
 Screenshots
 ===
-[sshot1](sshot1.png)
-[sshot2](sshot2.png)
-[sshot3](sshot3.png)
-[sshot4](sshot4.png)
+[sshot1](sshot1.PNG)
+[sshot2](sshot2.PNG)
+[sshot3](sshot3.PNG)
+[sshot4](sshot4.PNG)
 
 Notes:
 ===
