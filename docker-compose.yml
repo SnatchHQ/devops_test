@@ -9,7 +9,7 @@ services:
         target: /usr/share/nginx/html
     expose:
       - "${FPM_PORT}"
-    command: /start.sh
+    entrypoint: /start.sh
     environment:
       - FPM_PORT
 
@@ -23,8 +23,8 @@ services:
     expose:
       - "${NGINX_PORT}"
     ports:
-      - "${NGINX_PORT}:${NGINX_CLIENT_PORT}"
-    command: /start.sh
+      - "${NGINX_CLIENT_PORT}:${NGINX_PORT}"
+    entrypoint: /start.sh
     environment:
       - NGINX_PORT
       - NGINX_CLIENT_PORT
