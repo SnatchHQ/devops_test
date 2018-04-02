@@ -48,6 +48,10 @@ RUN apt-get update \
     && pip install supervisor supervisor-stdout
 
 # Install AWS CLI
+RUN apt-get install --no-install-recommends --no-install-suggests -q -y \
+        # groff and jq are "a must" for using AWS CLI
+        groff jq \
+        && rm -rf /var/lib/apt/lists/*
 RUN pip install awscli
 
 # Install composer
@@ -72,11 +76,10 @@ RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d \
     && sed -i -e "s/pm.min_spare_servers = 1/pm.min_spare_servers = 2/g" ${fpm_conf} \
     && sed -i -e "s/pm.max_spare_servers = 3/pm.max_spare_servers = 4/g" ${fpm_conf} \
     && sed -i -e "s/pm.max_requests = 500/pm.max_requests = 200/g" ${fpm_conf} \
-    && sed -i -e "s/^;clear_env = no$/clear_env = no/" ${fpm_conf} \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && sed -i -e "s/^;clear_env = no$/clear_env = no/" ${fpm_conf}
 
 # Supervisor config
-ADD supervisord.conf /etc/supervisord.conf
+COPY supervisord.conf /etc/supervisord.conf
 
 # Add Scripts
-ADD start.sh /start.sh
+COPY start.sh /start.sh
