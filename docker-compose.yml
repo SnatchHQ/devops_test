@@ -1,0 +1,33 @@
+version: '3.6'
+services:
+  php-fpm:
+    build:
+      context: ./docker/php-fpm
+    volumes:
+      - type: bind
+        source: ./site
+        target: /usr/share/nginx/html
+    expose:
+      - "${FPM_PORT}"
+    entrypoint: /start.sh
+    environment:
+      - FPM_PORT
+
+  nginx:
+    build:
+      context: ./docker/nginx
+    volumes:
+      - type: bind
+        source: ./site
+        target: /usr/share/nginx/html
+    expose:
+      - "${NGINX_PORT}"
+    ports:
+      - "${NGINX_CLIENT_PORT}:${NGINX_PORT}"
+    entrypoint: /start.sh
+    environment:
+      - NGINX_PORT
+      - NGINX_CLIENT_PORT
+      - FPM_PORT
+    depends_on:
+      - php-fpm
