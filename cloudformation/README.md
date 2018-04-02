@@ -10,7 +10,7 @@ Requirements
 
 Architecture
 ===
-As detailed in this [exported PNG](SnatchTestVPC1-designer.png), there is an ELB acting as the front-end for 2 EC2 instances, which are behind private subnets (in each AZ). These instances can access the internet through a NAT gateway instance in the public subnet. The security groups provided lock down access to the specified IP only.
+As detailed in this [exported PNG](SnatchTestVPC1-designer.png), there is an ELB acting as the front-end for 2 EC2 instances, which reside in a private subnet. These instances can access the internet through a NAT gateway instance in the public subnet. The security groups provided lock down access to the specified IP only.
 
 Screenshots
 ===
