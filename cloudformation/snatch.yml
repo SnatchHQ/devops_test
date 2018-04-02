@@ -19,6 +19,8 @@ Mappings:
       AMI: ami-e7527ed7
     us-west-2:
       AMI: ami-d114f295
+    eu-west-2:
+      AMI: ami-dff017b8
   NatRegionMap:
     us-east-1:
       AMI: ami-303b1458
@@ -26,6 +28,8 @@ Mappings:
       AMI: ami-7da94839
     us-west-2:
       AMI: ami-69ae8259
+    eu-west-2: 
+      AMI: ami-0a4c5a6e
 Resources:
   SnatchTestVPC1:
     Type: AWS::EC2::VPC
