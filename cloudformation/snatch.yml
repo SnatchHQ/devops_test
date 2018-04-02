@@ -1,0 +1,392 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: snatch-test CloudFormation intro template
+Parameters:
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: SSH key that will be used for EC2 instances (set up in web console)
+    ConstraintDescription: needs to be an existing EC2 keypair (set up in web console)
+  SSHAllowIPAddress:
+    Type: String
+    AllowedPattern: "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/32"
+    Description: IP address to allow SSH from (only /32s allowed)
+    ConstraintDescription: needs to be in A.B.C.D/32 form
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-1ecae776
+    us-west-1:
+      AMI: ami-e7527ed7
+    us-west-2:
+      AMI: ami-d114f295
+  NatRegionMap:
+    us-east-1:
+      AMI: ami-303b1458
+    us-west-1:
+      AMI: ami-7da94839
+    us-west-2:
+      AMI: ami-69ae8259
+Resources:
+  SnatchTestVPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      Tags:
+      - Key: resclass
+        Value: snatch-test-vpc
+  SnatchTestSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: resclass
+        Value: snatch-test-subnet
+      - Key: subnet-type
+        Value: public
+      VpcId:
+        Ref: SnatchTestVPC1
+  SnatchTestSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+      - Key: resclass
+        Value: snatch-test-subnet
+      - Key: subnet-type
+        Value: private
+      VpcId:
+        Ref: SnatchTestVPC1
+      AvailabilityZone:
+        Fn::GetAtt:
+        - SnatchTestSubnet1
+        - AvailabilityZone
+  SnatchTestGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: resclass
+        Value: snatch-test-gateway
+  SnatchTestGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: SnatchTestGateway
+      VpcId:
+        Ref: SnatchTestVPC1
+  SnatchTestPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: SnatchTestVPC1
+      Tags:
+      - Key: resclass
+        Value: snatch-test-routetable
+      - Key: routetable-type
+        Value: public
+  SnatchTestPublicDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: SnatchTestGateway
+      RouteTableId:
+        Ref: SnatchTestPublicRouteTable
+  SnatchTestPublicSubnet1Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: SnatchTestSubnet1
+      RouteTableId:
+        Ref: SnatchTestPublicRouteTable
+  SnatchTestPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: SnatchTestVPC1
+      Tags:
+      - Key: resclass
+        Value: snatch-test-routetable
+      - Key: routetable-type
+        Value: private
+  SnatchTestPrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      InstanceId:
+        Ref: SnatchTestNatGw
+      RouteTableId:
+        Ref: SnatchTestPrivateRouteTable
+  SnatchTestPrivateSubnet2Assoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: SnatchTestSubnet2
+      RouteTableId:
+        Ref: SnatchTestPrivateRouteTable
+  SnatchNatSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+      - Key: resclass
+        Value: snatch-test-sg
+      GroupDescription: NAT (External) Snatch security group
+      VpcId:
+        Ref: SnatchTestVPC1
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 10.0.1.0/24
+        FromPort: '80'
+        ToPort: '80'
+      - IpProtocol: tcp
+        CidrIp: 10.0.1.0/24
+        FromPort: '443'
+        ToPort: '443'
+      - IpProtocol: tcp
+        CidrIp:
+          Ref: SSHAllowIPAddress
+        FromPort: '22'
+        ToPort: '22'
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '22'
+        ToPort: '22'
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '80'
+        ToPort: '80'
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '443'
+        ToPort: '443'
+  SnatchPrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+      - Key: resclass
+        Value: snatch-test-sg
+      GroupDescription: Private (Internal) Snatch security group
+      VpcId:
+        Ref: SnatchTestVPC1
+      SecurityGroupIngress:
+      - IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: "-1"
+        CidrIp: 0.0.0.0/0
+  SnatchElbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+      - Key: resclass
+        Value: snatch-test-sg
+      GroupDescription: ELB (load balancer) Snatch security group
+      VpcId:
+        Ref: SnatchTestVPC1
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '80'
+        ToPort: '80'
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '443'
+        ToPort: '443'
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '80'
+        ToPort: '80'
+      - IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: '443'
+        ToPort: '443'
+  SnatchTestNatGw:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+        - NatRegionMap
+        - Ref: AWS::Region
+        - AMI
+      InstanceType: t2.micro
+      KeyName:
+        Ref: KeyPair
+      SubnetId:
+        Ref: SnatchTestSubnet1
+      SourceDestCheck: false
+      SecurityGroupIds:
+      - Ref: SnatchNatSecurityGroup
+      Tags:
+      - Key: resclass
+        Value: snatch-test-natgw
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "/usr/bin/yum -y update\n"
+            - 'echo "/opt/aws/bin/cfn-signal -e $? '
+            - "  --stack "
+            - Ref: AWS::StackName
+            - " "
+            - "  --resource SnatchTestNatGw "
+            - "  --region "
+            - Ref: AWS::Region
+            - " "
+            - "  && sed -i 's#^/opt/aws/bin/cfn-signal .*\\$##g' "
+            - '  /etc/rc.local" >> /etc/rc.local
+
+'
+            - "/sbin/reboot\n"
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT10M
+  SnatchTestELB1:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      HealthCheck:
+        HealthyThreshold: '2'
+        Interval: '5'
+        Target: HTTP:80/
+        Timeout: '3'
+        UnhealthyThreshold: '2'
+      Listeners:
+      - InstancePort: '80'
+        InstanceProtocol: HTTP
+        LoadBalancerPort: '80'
+        Protocol: HTTP
+      Scheme: internet-facing
+      Subnets:
+      - Ref: SnatchTestSubnet1
+      SecurityGroups:
+      - Ref: SnatchElbSecurityGroup
+      Instances:
+      - Ref: SnatchTestSrv1
+      - Ref: SnatchTestSrv2
+      Tags:
+      - Key: resclass
+        Value: snatch-test-elb
+  SnatchTestSrv1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+        - RegionMap
+        - Ref: AWS::Region
+        - AMI
+      InstanceType: t2.micro
+      KeyName:
+        Ref: KeyPair
+      SubnetId:
+        Ref: SnatchTestSubnet2
+      SecurityGroupIds:
+      - Ref: SnatchPrivateSecurityGroup
+      Tags:
+      - Key: resclass
+        Value: snatch-test-srv
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "/usr/bin/yum -y update\n"
+            - "/usr/bin/yum -y install httpd\n"
+            - "/sbin/chkconfig httpd on\n"
+            - 'echo ''<html><head></head><body>snatch-test-srv1</body></html>'' > /var/www/html/index.html
+
+'
+            - 'echo "/opt/aws/bin/cfn-signal -e $? '
+            - "  --stack "
+            - Ref: AWS::StackName
+            - " "
+            - "  --resource SnatchTestSrv1 "
+            - "  --region "
+            - Ref: AWS::Region
+            - " "
+            - "  && sed -i 's#^/opt/aws/bin/cfn-signal .*\\$##g' "
+            - '  /etc/rc.local" >> /etc/rc.local
+
+'
+            - "/sbin/reboot\n"
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT10M
+    DependsOn: SnatchTestNatGw
+  SnatchTestSrv2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Fn::FindInMap:
+        - RegionMap
+        - Ref: AWS::Region
+        - AMI
+      InstanceType: t2.micro
+      KeyName:
+        Ref: KeyPair
+      SubnetId:
+        Ref: SnatchTestSubnet2
+      SecurityGroupIds:
+      - Ref: SnatchPrivateSecurityGroup
+      Tags:
+      - Key: resclass
+        Value: snatch-test-srv
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "/usr/bin/yum -y update\n"
+            - "/usr/bin/yum -y install httpd\n"
+            - "/sbin/chkconfig httpd on\n"
+            - 'echo ''<html><head></head><body>snatch-test-srv2</body></html>'' > /var/www/html/index.html
+
+'
+            - 'echo "/opt/aws/bin/cfn-signal -e $? '
+            - "  --stack "
+            - Ref: AWS::StackName
+            - " "
+            - "  --resource SnatchTestSrv2 "
+            - "  --region "
+            - Ref: AWS::Region
+            - " "
+            - "  && sed -i 's#^/opt/aws/bin/cfn-signal .*\\$##g' "
+            - '  /etc/rc.local" >> /etc/rc.local
+
+'
+            - "/sbin/reboot\n"
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT10M
+    DependsOn: SnatchTestNatGw
+Outputs:
+  NatIPAddr:
+    Description: IP address of the NAT instance (shell to this address)
+    Value:
+      Fn::GetAtt:
+      - SnatchTestNatGw
+      - PublicIp
+  Srv1IPAddr:
+    Description: IP address of srv1 (internal)
+    Value:
+      Fn::GetAtt:
+      - SnatchTestSrv1
+      - PrivateIp
+  Srv2IPAddr:
+    Description: IP address of srv2 (internal)
+    Value:
+      Fn::GetAtt:
+      - SnatchTestSrv2
+      - PrivateIp
+  ELBDNSName:
+    Description: DNS host for the ELB
+    Value:
+      Fn::GetAtt:
+      - SnatchTestELB1
+      - DNSName
