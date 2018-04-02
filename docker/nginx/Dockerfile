@@ -12,17 +12,17 @@ RUN apt-get update \
     && echo "deb http://nginx.org/packages/mainline/debian/ stretch nginx" >> /etc/apt/sources.list \
     && apt-get update \
     && apt-get install --no-install-recommends --no-install-suggests -q -y \
-            apt-utils \
-            # Need envsubst which is part of gettext
-            gettext \
-            curl \
-            nano \
-            zip \
-            unzip \
-            python-pip \
-            python-setuptools \
-            git \
-            nginx=${NGINX_VERSION} \
+        apt-utils \
+        # Need envsubst which is part of gettext
+        gettext \
+        curl \
+        nano \
+        zip \
+        unzip \
+        python-pip \
+        python-setuptools \
+        git \
+        nginx=${NGINX_VERSION} \
     && pip install wheel \
     && pip install supervisor supervisor-stdout \
     && echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d \
@@ -30,10 +30,10 @@ RUN apt-get update \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Supervisor config
-ADD supervisord.conf /etc/supervisord.conf
+COPY supervisord.conf /etc/supervisord.conf
 
 # Override nginx's default config
-ADD default.conf /etc/nginx/default-source.conf
+COPY default.conf /etc/nginx/default-source.conf
 
 # Add Scripts
-ADD start.sh /start.sh
+COPY start.sh /start.sh
