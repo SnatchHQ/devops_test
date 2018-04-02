@@ -1,7 +1,10 @@
 Getting started
 =====
-This work requires Docker Compose
+This work requires Docker (v18.03) and Compose
 https://docs.docker.com/compose/install/#prerequisites
+
+It uses Debian Stretch as the base OS, with Python's supervisor tool for 
+managing the container runtimes.
 
 Building container images
 =====
