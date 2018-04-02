@@ -4,6 +4,7 @@ FROM debian:stretch
 ENV DEBIAN_FRONTEND noninteractive
 ENV php_conf /etc/php/7.2/fpm/php.ini
 ENV fpm_conf /etc/php/7.2/fpm/pool.d/www.conf
+ENV COMPOSER_VERSION 1.6.3
 
 # Install Basic Requirements
 RUN apt-get update \
@@ -45,6 +46,15 @@ RUN apt-get update \
     && mkdir -p /usr/share/nginx/html \
     && pip install wheel \
     && pip install supervisor supervisor-stdout
+
+# Install AWS CLI
+RUN pip install awscli
+
+# Install composer
+RUN curl -o /tmp/composer-setup.php https://getcomposer.org/installer \
+  && curl -o /tmp/composer-setup.sig https://composer.github.io/installer.sig \
+  && php -r "if (hash('SHA384', file_get_contents('/tmp/composer-setup.php')) !== trim(file_get_contents('/tmp/composer-setup.sig'))) { unlink('/tmp/composer-setup.php'); echo 'Invalid installer' . PHP_EOL; exit(1); }" \
+  && php /tmp/composer-setup.php --no-ansi --install-dir=/usr/local/bin --filename=composer --version=${COMPOSER_VERSION} && rm -rf /tmp/composer-setup.php
 
 # Configuration mainly for the PHP-FPM pool 'www'
 RUN echo "#!/bin/sh\nexit 0" > /usr/sbin/policy-rc.d \
